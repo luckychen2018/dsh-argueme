@@ -27,6 +27,7 @@
 ### Local development
 
 ```bash
+pnpm install                # installs @deepseek-ai/schemastery (host Config schema dependency)
 pnpm dsh plugin --profile <profile> add /path/to/dsh-argueme
 # or via the agent tool:
 # plugin_manager install_bundle { target: "/path/to/dsh-argueme" }

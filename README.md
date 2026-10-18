@@ -28,6 +28,7 @@ DSH（DeepSeek Harness）插件：每轮**由你发起**的对话正常结束后
 ### 本地开发
 
 ```bash
+pnpm install                # 安装 @deepseek-ai/schemastery（Host 端 Config schema 依赖）
 pnpm dsh plugin --profile <profile> add /path/to/dsh-argueme
 # 或让 agent 调用：
 # plugin_manager install_bundle { target: "/path/to/dsh-argueme" }
