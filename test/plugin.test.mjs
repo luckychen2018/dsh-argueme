@@ -9,11 +9,26 @@ import { apply, Config } from '../index.js'
 
 const HUMAN = { kind: 'user' }
 const OWN = { kind: 'plugin:dsh-argueme' }
+const GOAL = { kind: 'goal' }
+
+function goalView(overrides = {}) {
+  return {
+    id: 'goal-1',
+    revision: 1,
+    objective: 'test objective',
+    phase: 'active',
+    maxGoalRounds: 5,
+    roundsStarted: 1,
+    activation: 'armed',
+    ...overrides,
+  }
+}
 
 function createHarness({ rootsThrows = false } = {}) {
   const handlers = new Map()
   const agents = new Map()
   const roots = new Set()
+  const goals = new Map()
   const warnings = []
 
   const ctx = {
@@ -23,6 +38,10 @@ function createHarness({ rootsThrows = false } = {}) {
       list.push(fn)
       handlers.set(event, list)
       return () => {}
+    },
+    get(name) {
+      if (name !== 'goals') return undefined
+      return { get: (agent) => goals.get(agent) }
     },
     agents: {
       list: () => [...agents.values()],
@@ -44,10 +63,13 @@ function createHarness({ rootsThrows = false } = {}) {
       nextTurn: [],
       nextStep: [],
       remove(messageId) {
-        const index = this.nextTurn.findIndex((message) => message.id === messageId)
-        if (index < 0) return false
-        this.nextTurn.splice(index, 1)
-        return true
+        for (const list of [this.nextTurn, this.nextStep]) {
+          const index = list.findIndex((message) => message.id === messageId)
+          if (index < 0) continue
+          list.splice(index, 1)
+          return true
+        }
+        return false
       },
     }
     const agent = {
@@ -56,9 +78,14 @@ function createHarness({ rootsThrows = false } = {}) {
       session: { id },
       inbox,
       followups: [],
+      injects: [],
       followup(message) {
         this.followups.push(message)
         this.inbox.nextTurn.push(message)
+      },
+      inject(message) {
+        this.injects.push(message)
+        this.inbox.nextStep.push(message)
       },
     }
     agents.set(id, agent)
@@ -89,7 +116,7 @@ function createHarness({ rootsThrows = false } = {}) {
     emit('agent/status', { agent, status: 'idle' })
   }
 
-  return { ctx, agents, createAgent, claim, startTurn, endTurn, emit, warnings }
+  return { ctx, agents, createAgent, claim, startTurn, endTurn, emit, warnings, goals, setGoal: (agent, goal) => goals.set(agent, goal) }
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 20))
@@ -341,14 +368,18 @@ test('Config 导出：schemastery schema、默认值与 volatile 声明', async 
   const resolved = Config({})
   assert.equal(resolved.enabled.get(), true)
   assert.equal(resolved.prompt.get(), '')
+  assert.equal(resolved.includeGoalRounds.get(), false)
   assert.equal(resolved.includeSubagents, false)
-  // settings 表单只认 meta.volatile 字段：enabled/prompt 必须声明，includeSubagents 不声明。
+  // settings 表单只认 meta.volatile 字段：enabled/prompt/includeGoalRounds 必须声明，
+  // includeSubagents 不声明。
   const json = Config.toJSON()
   const root = json.refs[json.uid]
   assert.equal(root.type, 'object')
   assert.equal(json.refs[root.dict.enabled].meta.volatile, true)
   assert.equal(json.refs[root.dict.prompt].meta.volatile, true)
   assert.equal(json.refs[root.dict.prompt].meta.default, '')
+  assert.equal(json.refs[root.dict.includeGoalRounds].meta.volatile, true)
+  assert.equal(json.refs[root.dict.includeGoalRounds].meta.default, false)
   assert.equal(json.refs[root.dict.includeSubagents].meta.volatile, undefined)
 })
 
@@ -411,6 +442,85 @@ test('prompt 为空字符串（面板留空）同样使用内置文案', async (
   h.endTurn(agent, 1, 'completed')
   await tick()
   assert.ok(agent.followups[0].content[0].text.startsWith('【第一性原理复核'))
+  dispose()
+})
+
+test('goal 轮默认不触发（includeGoalRounds 默认关闭）', async () => {
+  const h = createHarness()
+  const dispose = apply(h.ctx, undefined)
+  const agent = h.createAgent('session-goal-default')
+  h.setGoal(agent, goalView())
+
+  h.startTurn(agent)
+  h.claim(agent, 1, message('g1', GOAL))
+  h.endTurn(agent, 1, 'completed')
+  await tick()
+
+  assert.equal(agent.followups.length, 0)
+  assert.equal(agent.injects.length, 0)
+  dispose()
+})
+
+test('开启后每个 goal 轮注入一次挑刺到 next-step，不新增 turn', async () => {
+  const h = createHarness()
+  const dispose = apply(h.ctx, { includeGoalRounds: true })
+  const agent = h.createAgent('session-goal-each')
+  h.setGoal(agent, goalView())
+
+  for (let turn = 1; turn <= 3; turn += 1) {
+    h.startTurn(agent)
+    // 上一轮注入的 next-step 内容会在本轮开始被领取。
+    if (turn > 1) h.claim(agent, turn, agent.injects[turn - 2])
+    h.claim(agent, turn, message(`g${turn}`, GOAL))
+    h.endTurn(agent, turn, 'completed')
+    await tick()
+
+    assert.equal(agent.injects.length, turn, `turn ${turn}: exactly one injection per goal round`)
+    assert.equal(agent.followups.length, 0, 'goal rounds never queue a separate follow-up turn')
+    assert.deepEqual(agent.injects[turn - 1].source, OWN)
+    assert.ok(agent.injects[turn - 1].content[0].text.startsWith('【第一性原理复核'))
+  }
+  dispose()
+})
+
+test('goal 非 active/armed 或回合预算用尽时不注入', async () => {
+  const scenarios = [
+    goalView({ phase: 'paused' }),
+    goalView({ activation: 'disarmed' }),
+    goalView({ roundsStarted: 5, maxGoalRounds: 5 }),
+  ]
+  for (const goal of scenarios) {
+    const h = createHarness()
+    const dispose = apply(h.ctx, { includeGoalRounds: true })
+    const agent = h.createAgent('session-goal-inactive')
+    h.setGoal(agent, goal)
+
+    h.startTurn(agent)
+    h.claim(agent, 1, message('g1', GOAL))
+    h.endTurn(agent, 1, 'completed')
+    await tick()
+
+    assert.equal(agent.injects.length, 0, `no injection for ${JSON.stringify(goal)}`)
+    assert.equal(agent.followups.length, 0)
+    dispose()
+  }
+})
+
+test('goal 结束（pause/complete/block/clear）时撤回未领取的注入', async () => {
+  const h = createHarness()
+  const dispose = apply(h.ctx, { includeGoalRounds: true })
+  const agent = h.createAgent('session-goal-retract')
+  h.setGoal(agent, goalView())
+
+  h.startTurn(agent)
+  h.claim(agent, 1, message('g1', GOAL))
+  h.endTurn(agent, 1, 'completed')
+  await tick()
+  assert.equal(agent.injects.length, 1)
+  assert.equal(agent.inbox.nextStep.length, 1)
+
+  h.emit('goal/changed', { agent, change: { operation: 'pause', goal: goalView({ phase: 'paused', activation: 'disarmed' }) } })
+  assert.equal(agent.inbox.nextStep.length, 0, 'pending injection is retracted when the goal stops')
   dispose()
 })
 

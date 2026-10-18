@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-18
+
+### Added
+- `includeGoalRounds` (volatile, default `false`): optional critique for goal auto-rounds.
+  - Delivered with `agent.inject()` into the next goal round's step context, so goal-round-driver never
+    sees a competing next-turn prompt and the goal loop keeps running.
+  - At most one injection per goal round; only while the goal is `active`/`armed` with round budget
+    left; pending injections are retracted when the goal pauses/completes/blocks/clears.
+  - Plugins-page switch for it; the injected message keeps source `plugin:dsh-argueme`, so it can never
+    be mistaken for a human turn (no self-trigger loop).
+
 ## [1.2.3] - 2026-10-18
 
 ### Added

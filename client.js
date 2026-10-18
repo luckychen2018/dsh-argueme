@@ -35,6 +35,8 @@ window.__ModuleLoader__.load({
       enabledDesc: '关闭后不再自动发送；也可以直接在插件行上停用整个插件。',
       prompt: '追问内容',
       promptHint: '留空 = 使用内置「第一性原理复核」文案（灰色背景字）；填写内容则覆盖它。',
+      goalRounds: 'goal 循环也挑刺',
+      goalRoundsDesc: '开启后每个 goal 自动轮结束后，把挑刺请求注入下一轮 goal 的上下文（不新增 turn、不打断 goal 循环）。默认关闭。',
       save: '保存',
       saving: '保存中…',
       saved: '已保存',
@@ -52,6 +54,8 @@ window.__ModuleLoader__.load({
       enabledDesc: 'When off, nothing is sent automatically. You can also disable the whole plugin row.',
       prompt: 'Follow-up prompt',
       promptHint: 'Leave empty to use the built-in 「第一性原理复核」 prompt (shown as placeholder); typing overrides it.',
+      goalRounds: 'Critique goal rounds',
+      goalRoundsDesc: 'When on, after each automatic goal round the critique is injected into the next goal round context (no extra turn, the goal loop keeps running). Off by default.',
       save: 'Save',
       saving: 'Saving…',
       saved: 'Saved',
@@ -240,6 +244,7 @@ window.__ModuleLoader__.load({
         const value = snapshot.value !== null && typeof snapshot.value === 'object' ? snapshot.value : {}
         const writable = snapshot.writable === true
         const enabled = value.enabled !== false
+        const goalRounds = value.includeGoalRounds === true
         const promptText = draft !== null
           ? draft
           : (typeof value.prompt === 'string' ? value.prompt : '')
@@ -293,6 +298,21 @@ window.__ModuleLoader__.load({
               checked: enabled,
               disabled: !writable,
               onChange: (event) => write('enabled', event.target.checked, t('saved')),
+            }),
+          ),
+
+          h('div', { style: T.row },
+            h('div', {},
+              h('div', { style: T.label }, t('goalRounds')),
+              h('div', { style: T.hint }, t('goalRoundsDesc')),
+            ),
+            h('input', {
+              type: 'checkbox',
+              role: 'switch',
+              'aria-checked': goalRounds,
+              checked: goalRounds,
+              disabled: !writable,
+              onChange: (event) => write('includeGoalRounds', event.target.checked, t('saved')),
             }),
           ),
 

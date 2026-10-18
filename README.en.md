@@ -51,6 +51,7 @@ Open **Plugins → dsh-argueme**: the card appears under the description, and th
 | --- | --- | --- | --- |
 | `enabled` | boolean | `true` | Live-editable. Off = never auto-send. |
 | `prompt` | string | `""` (empty = built-in prompt) | Live-editable. Empty uses the built-in first-principles review prompt; typing overrides it. |
+| `includeGoalRounds` | boolean | `false` | Also critique each automatic goal round (live-editable). **Off by default**. When on, it does not add a turn: the critique is injected into the next goal round's context as model-facing input, so goal-round-driver does not see a competing prompt and the goal loop keeps running. At most once per round; pending injections are retracted when the goal pauses/completes/blocks/clears. |
 | `includeSubagents` | boolean | `false` | Also react to non-root agent turns (subagents / workflows / Agent Teams). Non-volatile; changing it remounts the row. **Careful**: subagent seeds are `user`-sourced, and the critique can replace a subagent's final answer. |
 
 ## Behavior and safety invariants
@@ -61,6 +62,20 @@ Open **Plugins → dsh-argueme**: the card appears under the description, and th
 4. **Completed turns only**: `turn/end` must be `completed`; aborted / error / blocked / max-tokens / interrupted are skipped; pending inbox input is never jumped.
 
 Cost: each human round adds one full model call. Disable the row or set `enabled` to `false` if you do not want that.
+
+### Goal loops (optional)
+
+Goal round prompts come from `source.kind = "goal"`, not `user`, so they are skipped by default. With
+`includeGoalRounds` enabled:
+
+- **No extra turn**: the critique is delivered with `inject()` (next-step, without waking the driver)
+  into the **next goal round** context; the model sees it in that round's steps.
+- **The goal loop keeps running**: queueing a separate follow-up instead would be recorded by
+  goal-round-driver as `competingQueued` and pause the goal (0.2.1 behavior).
+- **No loop**: at most one injection per round; the injected message is sourced `plugin:dsh-argueme` and
+  can never count as a human turn; nothing is injected unless the goal is `active`/`armed` with round
+  budget left; pending injections are retracted when the goal pauses/completes/blocks/clears.
+- Injection is model-facing context; it does not guarantee a standalone critique answer.
 
 ## Built-in follow-up prompt (first principles)
 

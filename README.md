@@ -52,6 +52,7 @@ dsh plugin --profile <profile> add <本目录绝对路径>
 | --- | --- | --- | --- |
 | `enabled` | boolean | `true` | 总开关，面板内实时生效。`false` 时不再自动追问。 |
 | `prompt` | string | `""`（空 = 内置文案） | 追问内容；留空使用内置「第一性原理复核」文案，填写则覆盖。面板为多行输入框，内置文案以灰色背景字显示。 |
+| `includeGoalRounds` | boolean | `false` | 是否在 goal 自动循环的每一轮也挑刺（面板内实时生效）。**默认关闭**。开启后不新增 turn，而是把挑刺请求注入下一轮 goal 的上下文（不会产生 goal-round-driver 眼中的 competing prompt，goal 循环继续跑）；每轮最多一次，goal 结束/暂停/清空时撤回未领取的注入。 |
 | `includeSubagents` | boolean | `false` | 是否也响应非 root agent 的轮次（子代理 / workflow / Agent Teams）。**默认关闭是有意的**：子代理的初始 prompt 也是 `user` 来源，开启后每个子代理首轮都会被追问一次，且子代理的最终输出可能变成那段自审而不是任务结果。非 volatile 字段，改动会重挂该插件行。 |
 
 > 面板依赖 Web 客户端加载本插件的 client 半边。安装/升级后若暂未看到卡片，刷新一次页面即可。
@@ -68,6 +69,15 @@ dsh plugin --profile <profile> add <本目录绝对路径>
    收件箱还有待领取输入时不插队。因此同一运行内连续发多条消息时，只会在队列清空后的最后一条之后自审一次。
 
 其余约束：每个 turn 最多触发一次；插件卸载时撤回尚未被领取的追问消息。
+
+### goal 循环（可选）
+
+goal 自动轮的 prompt 来源是 `goal` 而不是 `user`，默认不触发挑刺。开启 `includeGoalRounds` 后：
+
+- **不新增 turn**：挑刺文本用 `inject()`（next-step，不唤醒 driver）进入**下一轮 goal** 的上下文；模型在那一轮的步骤里看到它。
+- **不打断 goal 循环**：如果改成追加追问（next-turn），goal-round-driver 会把它记为 `competingQueued` 并暂停 goal（0.2.1 行为）——这也是默认关闭的原因。
+- **不死循环**：每轮最多注入一次；注入消息来源是 `plugin:dsh-argueme`，永远不会被当作人类轮；goal 非 `active`/`armed` 或回合预算用尽时不注入；goal 暂停/完成/block/clear 时撤回尚未被领取的注入。
+- 注入是"模型可见上下文"，不保证模型一定单独输出一段挑刺（它可能把自审并入本轮输出）。
 
 ## 内置追问文案（第一性原理）
 
@@ -86,7 +96,8 @@ dsh plugin --profile <profile> add <本目录绝对路径>
 
 ## 成本提示（重要）
 
-每轮用户对话都会**多出一次完整的模型调用**（额外一轮输入 + 输出），token 开销与响应延迟都会增加。
+每轮用户对话都会**多出一次完整的模型调用**（额外一轮输入 + 输出），token 开销与响应延迟都会增加；
+开启 `includeGoalRounds` 后每个 goal 轮还会多一次注入（不新增 turn，但会增加上下文与输出长度）。
 不需要时请把 `enabled` 设为 `false`，或在 Plugin Manager 停用该插件。
 
 ## 发布与收录
