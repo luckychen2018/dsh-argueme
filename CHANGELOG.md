@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-10-18
+
+### Changed
+- `includeGoalRounds` now inserts a **separate critique turn** between goal rounds
+  (goal round N → critique turn → goal round N+1) instead of injecting the critique into the next
+  goal round's context. The turn is queued synchronously during the idle transition, before
+  goal-round-driver's asynchronous continuation, so the driver backs off (`competingQueued`) and the
+  goal loop resumes after the critique turn instead of being paused.
+
 ## [1.3.0] - 2026-10-18
 
 ### Added

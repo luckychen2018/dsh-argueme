@@ -54,6 +54,7 @@ const BUILT_IN_PROMPT = `【第一性原理复核 · 只针对你上一轮回答
  * - `enabled` / `prompt` / `includeGoalRounds`：实时生效，改完立即用于下一轮判定，不重挂插件行；
  * - `includeSubagents`：普通字段，改动会重挂该行（默认关闭，不常改）。
  * `prompt` 默认为空字符串 = 使用内置「第一性原理复核」文案；填写内容则覆盖。
+ * `includeGoalRounds` 开启后，每个 goal 自动轮结束会插入一个独立挑刺轮（见 maybeInsertGoalCritique）。
  */
 export const Config = z.object({
   enabled: z.boolean().default(true).volatile(),
@@ -131,8 +132,6 @@ function createState(agent) {
     claimedPrompt: undefined,
     /** 最近一次观察到 goal prompt 被领取的 turn 编号。 */
     goalTurn: undefined,
-    /** 本 agent 已经为哪个 goal turn 注入过挑刺。 */
-    injectedTurn: undefined,
     /** 本 agent 已经为哪个 turn 追加过追问。 */
     triggeredTurn: undefined,
     /** 已注入、尚未被领取的自动消息。 */
@@ -201,6 +200,53 @@ export function apply(ctx, rawConfig) {
   }
 
   /**
+   * goal 轮结束时的独立挑刺轮（可选，默认关闭）。
+   *
+   * 必须在本轮 idle 的同步阶段插入：goal-round-driver 也在同一个 idle 上续下一轮，
+   * 它只在「看到外来 next-turn 消息」时退让（competingQueued），且退让检查发生在异步
+   * 续轮之前。若晚于它入队，就会出现两个 next-turn 消息：挑刺轮跑完后 goal round 仍在
+   * 队列里，driver 会把它当作暂停条件并 pause goal。因此这里同步 followup（不经过 setTimeout）。
+   */
+  function maybeInsertGoalCritique(state) {
+    if (readOption(configSource, 'enabled', true) === false || stopping || state.stopping) return
+    if (typeof ctx.fiber?.state === 'number' && ctx.fiber.state !== 2) return
+    if (readOption(configSource, 'includeGoalRounds', false) !== true) return
+    const { agent } = state
+    if (!isLive(agent) || agent.status !== 'idle') return
+    if (state.pendingMessage !== undefined) return
+
+    const turn = state.lastTurn
+    if (typeof turn !== 'number' || state.lastEndReason !== 'completed') return
+    if (readOption(configSource, 'includeSubagents', false) !== true && !isRootAgent(agent)) return
+    if (state.goalTurn !== turn) return
+    if (state.triggeredTurn === turn) return
+
+    const goal = readGoal(agent)
+    if (goal === undefined || goal === null) return
+    if (goal.phase !== 'active' || goal.activation !== 'armed') return
+    if (typeof goal.roundsStarted === 'number' && typeof goal.maxGoalRounds === 'number'
+      && goal.roundsStarted >= goal.maxGoalRounds) return
+
+    // 已有别的待领取输入时不插队：那种情况 driver 会自己退让，下一轮再判定。
+    const nextTurn = agent.inbox?.nextTurn
+    const nextStep = agent.inbox?.nextStep
+    if (Array.isArray(nextTurn) && nextTurn.length > 0) return
+    if (Array.isArray(nextStep) && nextStep.length > 0) return
+
+    // 追问内容在这里实时读取：Plugins 页修改 prompt 后立即用于下一轮。
+    const prompt = normalizePrompt(readOption(configSource, 'prompt', ''))
+    const message = createPromptMessage(prompt)
+    state.pendingMessage = message
+    try {
+      agent.followup(message)
+      state.triggeredTurn = turn
+    } catch (error) {
+      state.pendingMessage = undefined
+      warn(`could not queue goal critique for turn ${turn} of agent "${agent.id}": ${String(error)}`)
+    }
+  }
+
+  /**
    * 单次判定 + 注入。所有前置条件不满足时静默返回，不做任何猜测。
    */
   async function drive(state) {
@@ -220,35 +266,10 @@ export function apply(ctx, rawConfig) {
     const nextStep = agent.inbox?.nextStep
 
     // 不变量 1 + 2：只认已观察到的人类 prompt，看不到来源就不触发。
+    // goal 自动轮走 maybeInsertGoalCritique 的同步路径（见上），这里只处理人类轮。
     const claimedPrompt = state.claimedTurn === turn ? state.claimedPrompt : undefined
     const human = claimedPrompt !== undefined && isHumanMessage(claimedPrompt) && !isOwnMessage(claimedPrompt)
-
-    if (!human) {
-      // goal 自动轮（可选，默认关闭）：把挑刺请求注入下一轮 goal 的上下文，不新增 turn、
-      // 不唤醒 driver —— 这样不会产生 goal-round-driver 眼中的 competing prompt
-      // （0.2.1 会把外来 next-turn 消息记为 competingQueued 并暂停 goal 循环）。
-      if (readOption(configSource, 'includeGoalRounds', false) !== true) return
-      if (state.goalTurn !== turn) return
-      if (state.injectedTurn === turn) return
-      const goal = readGoal(agent)
-      if (goal === undefined || goal === null) return
-      if (goal.phase !== 'active' || goal.activation !== 'armed') return
-      if (typeof goal.roundsStarted === 'number' && typeof goal.maxGoalRounds === 'number'
-        && goal.roundsStarted >= goal.maxGoalRounds) return
-      if (Array.isArray(nextStep) && nextStep.length > 0) return
-
-      const prompt = normalizePrompt(readOption(configSource, 'prompt', ''))
-      const message = createPromptMessage(prompt)
-      state.pendingMessage = message
-      try {
-        agent.inject(message)
-        state.injectedTurn = turn
-      } catch (error) {
-        state.pendingMessage = undefined
-        warn(`could not inject "${prompt}" for goal turn ${turn} of agent "${agent.id}": ${String(error)}`)
-      }
-      return
-    }
+    if (!human) return
 
     if (state.triggeredTurn === turn) return
     // 不变量 3：绝不连续自动追问（防御来源判定未来被意外破坏）。
@@ -316,7 +337,14 @@ export function apply(ctx, rawConfig) {
 
   ctx.on('agent/status', ({ agent, status }) => {
     if (status !== 'idle') return
-    requestDrive(stateFor(agent))
+    const state = stateFor(agent)
+    // goal 轮：必须在 goal-round-driver 异步续轮之前同步插入独立挑刺轮，否则会被它暂停。
+    try {
+      maybeInsertGoalCritique(state)
+    } catch (error) {
+      warn(`goal critique insertion failed for agent "${agent.id}": ${String(error)}`)
+    }
+    requestDrive(state)
   })
 
   ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
@@ -340,7 +368,6 @@ export function apply(ctx, rawConfig) {
       state.pendingMessage = undefined
       // 追问在进入任何 turn 之前被取消：撤销触发记账，避免下一轮被连跳熔断误伤。
       state.triggeredTurn = undefined
-      state.injectedTurn = undefined
     }
   })
 
@@ -350,7 +377,7 @@ export function apply(ctx, rawConfig) {
     const state = states.get(agent)
     const pending = state?.pendingMessage
     if (state === undefined || pending === undefined) return
-    // goal 不再自动续轮：撤回尚未被领取的注入，避免它漂移到之后的人类轮。
+    // goal 不再自动续轮：撤回尚未被领取的挑刺轮，避免它漂移到之后的人类轮。
     state.pendingMessage = undefined
     try {
       state.agent.inbox?.remove?.(pending.id)

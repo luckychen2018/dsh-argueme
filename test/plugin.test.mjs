@@ -24,6 +24,31 @@ function goalView(overrides = {}) {
   }
 }
 
+/**
+ * 简化版 goal-round-driver：在 idle 的异步阶段续一轮 goal；看到外来 next-turn 消息
+ * （competingQueued）时退让。用于验证我们的同步插入能赢下这个竞争。
+ */
+function attachFakeGoalDriver(h, agent) {
+  const state = { competing: false, round: 0 }
+  h.ctx.on('agent/status', ({ agent: target, status }) => {
+    if (target !== agent || status !== 'idle') return
+    state.competing = false
+    Promise.resolve().then(() => {
+      if (state.competing || agent.status !== 'idle') return
+      const goal = h.goals.get(agent)
+      if (goal === undefined || goal.phase !== 'active' || goal.activation !== 'armed') return
+      state.round += 1
+      agent.inbox.nextTurn.push(message(`goal-round-${state.round}`, GOAL, '<goal_round>'))
+    })
+  })
+  h.ctx.on('agent/inbox/inserted', ({ agent: target, message: inserted }) => {
+    if (target !== agent) return
+    if (inserted.source?.kind === 'goal') return
+    state.competing = true
+  })
+  return state
+}
+
 function createHarness({ rootsThrows = false } = {}) {
   const handlers = new Map()
   const agents = new Map()
@@ -82,10 +107,12 @@ function createHarness({ rootsThrows = false } = {}) {
       followup(message) {
         this.followups.push(message)
         this.inbox.nextTurn.push(message)
+        emit('agent/inbox/inserted', { agent: this, message })
       },
       inject(message) {
         this.injects.push(message)
         this.inbox.nextStep.push(message)
+        emit('agent/inbox/inserted', { agent: this, message })
       },
     }
     agents.set(id, agent)
@@ -461,29 +488,41 @@ test('goal 轮默认不触发（includeGoalRounds 默认关闭）', async () => 
   dispose()
 })
 
-test('开启后每个 goal 轮注入一次挑刺到 next-step，不新增 turn', async () => {
+test('开启后每个 goal 轮结束都同步插入独立挑刺轮，下一轮 goal 继续', async () => {
   const h = createHarness()
   const dispose = apply(h.ctx, { includeGoalRounds: true })
   const agent = h.createAgent('session-goal-each')
   h.setGoal(agent, goalView())
 
-  for (let turn = 1; turn <= 3; turn += 1) {
-    h.startTurn(agent)
-    // 上一轮注入的 next-step 内容会在本轮开始被领取。
-    if (turn > 1) h.claim(agent, turn, agent.injects[turn - 2])
-    h.claim(agent, turn, message(`g${turn}`, GOAL))
-    h.endTurn(agent, turn, 'completed')
-    await tick()
+  h.startTurn(agent)
+  h.claim(agent, 1, message('g1', GOAL))
+  h.endTurn(agent, 1, 'completed')
+  // 同步插入：不需要等待任何 tick。
+  assert.equal(agent.followups.length, 1, 'critique turn is queued synchronously at goal round end')
+  assert.deepEqual(agent.followups[0].source, OWN)
+  assert.ok(agent.followups[0].content[0].text.startsWith('【第一性原理复核'))
+  assert.equal(agent.injects.length, 0)
+  await tick()
+  assert.equal(agent.followups.length, 1, 'async driver must not double-queue')
+  assert.equal(agent.inbox.nextTurn.length, 1)
 
-    assert.equal(agent.injects.length, turn, `turn ${turn}: exactly one injection per goal round`)
-    assert.equal(agent.followups.length, 0, 'goal rounds never queue a separate follow-up turn')
-    assert.deepEqual(agent.injects[turn - 1].source, OWN)
-    assert.ok(agent.injects[turn - 1].content[0].text.startsWith('【第一性原理复核'))
-  }
+  // 挑刺轮本身结束：不触发新追问。
+  h.startTurn(agent)
+  h.claim(agent, 2, agent.followups[0])
+  h.endTurn(agent, 2, 'completed')
+  await tick()
+  assert.equal(agent.followups.length, 1)
+
+  // 下一轮 goal：再插一次。
+  h.setGoal(agent, goalView({ roundsStarted: 2 }))
+  h.startTurn(agent)
+  h.claim(agent, 3, message('g2', GOAL))
+  h.endTurn(agent, 3, 'completed')
+  assert.equal(agent.followups.length, 2, 'each goal round gets its own critique turn')
   dispose()
 })
 
-test('goal 非 active/armed 或回合预算用尽时不注入', async () => {
+test('goal 非 active/armed 或回合预算用尽时不插入挑刺轮', async () => {
   const scenarios = [
     goalView({ phase: 'paused' }),
     goalView({ activation: 'disarmed' }),
@@ -498,15 +537,12 @@ test('goal 非 active/armed 或回合预算用尽时不注入', async () => {
     h.startTurn(agent)
     h.claim(agent, 1, message('g1', GOAL))
     h.endTurn(agent, 1, 'completed')
-    await tick()
-
-    assert.equal(agent.injects.length, 0, `no injection for ${JSON.stringify(goal)}`)
-    assert.equal(agent.followups.length, 0)
+    assert.equal(agent.followups.length, 0, `no critique turn for ${JSON.stringify(goal)}`)
     dispose()
   }
 })
 
-test('goal 结束（pause/complete/block/clear）时撤回未领取的注入', async () => {
+test('goal 结束（pause/complete/block/clear）时撤回未领取的挑刺轮', async () => {
   const h = createHarness()
   const dispose = apply(h.ctx, { includeGoalRounds: true })
   const agent = h.createAgent('session-goal-retract')
@@ -515,12 +551,54 @@ test('goal 结束（pause/complete/block/clear）时撤回未领取的注入', a
   h.startTurn(agent)
   h.claim(agent, 1, message('g1', GOAL))
   h.endTurn(agent, 1, 'completed')
-  await tick()
-  assert.equal(agent.injects.length, 1)
-  assert.equal(agent.inbox.nextStep.length, 1)
+  assert.equal(agent.inbox.nextTurn.length, 1)
 
   h.emit('goal/changed', { agent, change: { operation: 'pause', goal: goalView({ phase: 'paused', activation: 'disarmed' }) } })
-  assert.equal(agent.inbox.nextStep.length, 0, 'pending injection is retracted when the goal stops')
+  assert.equal(agent.inbox.nextTurn.length, 0, 'pending critique turn is retracted when the goal stops')
+  dispose()
+})
+
+test('不插队：goal 轮结束时已有待领取输入则跳过', async () => {
+  const h = createHarness()
+  const dispose = apply(h.ctx, { includeGoalRounds: true })
+  const agent = h.createAgent('session-goal-busy')
+  h.setGoal(agent, goalView())
+
+  h.startTurn(agent)
+  h.claim(agent, 1, message('g1', GOAL))
+  agent.inbox.nextTurn.push(message('pending-human', HUMAN))
+  h.endTurn(agent, 1, 'completed')
+  assert.equal(agent.followups.length, 0)
+  dispose()
+})
+
+test('与 goal-round-driver 的异步续轮竞争：挑刺轮先占队列，goal 随后继续', async () => {
+  const h = createHarness()
+  const agent = h.createAgent('session-goal-race')
+  // 先注册假 driver，模拟真实场景中 goal-round-driver 的监听顺序（早于本插件）。
+  const driver = attachFakeGoalDriver(h, agent)
+  const dispose = apply(h.ctx, { includeGoalRounds: true })
+  h.setGoal(agent, goalView())
+
+  h.startTurn(agent)
+  h.claim(agent, 1, message('g1', GOAL))
+  h.endTurn(agent, 1, 'completed')
+  assert.equal(agent.followups.length, 1)
+  await tick()
+  assert.deepEqual(
+    agent.inbox.nextTurn.map((queued) => queued.source.kind),
+    ['plugin:dsh-argueme'],
+    'the driver must back off; only the critique turn is queued',
+  )
+  assert.equal(driver.competing, true)
+
+  // 挑刺轮跑完，goal 循环恢复。
+  h.startTurn(agent)
+  h.claim(agent, 2, agent.followups[0])
+  h.endTurn(agent, 2, 'completed')
+  await tick()
+  assert.ok(agent.inbox.nextTurn.some((queued) => queued.source.kind === 'goal'),
+    'a goal round continues after the critique turn')
   dispose()
 })
 
