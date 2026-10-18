@@ -1,0 +1,13 @@
+# dsh-argueme bundle layer.
+# Inserts one Host-only row: after every completed human-authored conversation
+# round, queue one automatic user-role follow-up.
+# The follow-up text defaults to the built-in 「第一性原理复核」 prompt in
+# index.js (BUILT_IN_PROMPT); a non-empty config.prompt overrides it.
+# Toggle from the Plugin Manager, or override this row in the profile patch
+# layer with `- id: dsh-argueme` / `disabled: true`.
+- insert:
+    - id: dsh-argueme
+      name: 'dsh-argueme'
+      config:
+        enabled: true
+        includeSubagents: false

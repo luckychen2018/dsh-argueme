@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="rrTitle rrDesc">
+  <title id="rrTitle">每轮自审 · 自动追问</title>
+  <desc id="rrDesc">A speech bubble inside a circular review arrow, with a critique spark.</desc>
+  <defs>
+    <linearGradient id="rrPlate" x1="6" y1="4" x2="122" y2="124" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#161D33"/>
+      <stop offset="0.55" stop-color="#3A3F73"/>
+      <stop offset="1" stop-color="#7C5CE0"/>
+    </linearGradient>
+    <clipPath id="rrClip">
+      <rect x="4" y="4" width="120" height="120" rx="28"/>
+    </clipPath>
+  </defs>
+
+  <!-- tile -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#rrPlate)"/>
+  <g clip-path="url(#rrClip)">
+    <rect x="4" y="4" width="120" height="120" fill="#FFFFFF" fill-opacity="0.04"/>
+  </g>
+
+  <!-- circular review arrow: the "every round" loop -->
+  <path d="M 30 70 A 38 38 0 1 1 68 106" fill="none" stroke="#EDE9FE" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 74 98 L 62 106 L 74 114 Z" fill="#EDE9FE"/>
+
+  <!-- speech bubble: the answer being re-questioned -->
+  <rect x="34" y="34" width="60" height="40" rx="14" fill="#FDFBFF"/>
+  <path d="M 52 74 L 48 92 L 66 74 Z" fill="#FDFBFF"/>
+  <circle cx="50" cy="54" r="4" fill="#3A3F73"/>
+  <circle cx="64" cy="54" r="4" fill="#3A3F73"/>
+  <circle cx="78" cy="54" r="4" fill="#3A3F73"/>
+
+  <!-- critique spark -->
+  <path d="M 97 22 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 z" fill="#FFC857"/>
+
+  <!-- crisp edge for light and dark UI themes -->
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
+</svg>

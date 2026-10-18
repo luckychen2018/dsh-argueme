@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-argueme · Round Self-Review",
+    "description": "After each completed human-authored round, asks the configured follow-up prompt (default 「挑刺」) so the assistant critiques its previous answer. Only human rounds trigger it, so it cannot loop on itself."
+  }
+}

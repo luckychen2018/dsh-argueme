@@ -1,0 +1,82 @@
+{
+  "name": "dsh-argueme",
+  "version": "1.2.2",
+  "private": false,
+  "description": "DSH plugin: after each completed user round, automatically asks the assistant a first-principles critique follow-up (「挑刺」) so it reviews its previous answer. Ships a Plugins-page config card (toggle + editable prompt).",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node test/plugin.test.mjs",
+    "check": "node --check index.js && node --check client.js && node test/plugin.test.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "self-review",
+    "critique",
+    "first-principles",
+    "挑刺",
+    "argueme"
+  ],
+  "author": "luckychen2018",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luckychen2018/dsh-argueme.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luckychen2018/dsh-argueme/issues"
+  },
+  "homepage": "https://github.com/luckychen2018/dsh-argueme#readme",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
