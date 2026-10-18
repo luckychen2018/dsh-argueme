@@ -89,6 +89,28 @@ dsh plugin --profile <profile> add <本目录绝对路径>
 每轮用户对话都会**多出一次完整的模型调用**（额外一轮输入 + 输出），token 开销与响应延迟都会增加。
 不需要时请把 `enabled` 设为 `false`，或在 Plugin Manager 停用该插件。
 
+## 发布与收录
+
+DSH 官方**不托管中央插件索引**：插件市场是「用户自行添加的 JSON 索引源」
+（官方文档：[插件市场](https://deepseek-harness.github.io/deepseek-harness/guide/plugin-market)）。
+因此「上官方源」实际分三步：
+
+1. **发布 npm 包**（安装的真实来源；多数社区索引从 npm 抓取）：
+
+   ```bash
+   npm login --registry=https://registry.npmjs.org
+   npm publish --registry=https://registry.npmjs.org
+   ```
+
+   本机 npm registry 默认指向镜像（`registry.npmmirror.com`），发布时必须显式指定官方 registry。
+2. **提交社区索引收录**（社区目录，非 DeepSeek 官方审核）：
+   - `awesome-dsh-plugin/awesome-dsh-plugin`：提交 PR，按其 `contributing.md` 的评审标准；
+     dshmarket 的插件提交入口指向该目录。
+   - `EasonMWS/dsh-plugin-health`：format-1 索引，从 npm 生态自动生成，收录不代表安全审核。
+3. **自建索引源（无需审核）**：本仓库已内置 `market/index.json`（format-1）。
+   按 [market/README.md](market/README.md) 用 GitHub Pages 发布后，在 DSH
+   **Plugins → 自定义插件市场 → 发现 → 添加索引源** 中粘贴索引 URL。
+
 ## 开发
 
 ```bash

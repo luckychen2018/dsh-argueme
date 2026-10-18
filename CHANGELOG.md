@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.3] - 2026-10-18
+
+### Added
+- `engines.dsh` (`>=0.2.0-rc.2 <0.3.0`) so plugin-market indexes can compute DSH compatibility.
+- `market/index.json` — a ready format-1 plugin market index (self-hostable via GitHub Pages) plus
+  `market/README.md` with hosting and listing instructions.
+
 ## [1.2.2] - 2026-10-18
 
 ### Fixed

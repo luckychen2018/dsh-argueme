@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-argueme",
+    "zh": "dsh-argueme · 每轮自审"
+  },
+  "description": {
+    "en": "Per-round first-principles self-review plugin for DeepSeek Harness.",
+    "zh": "DeepSeek Harness 每轮第一性原理自审插件：每轮对话结束后自动追问一次自我复核，并带 Plugins 页配置面板。"
+  },
+  "metadata": {
+    "categories": {
+      "tools": {
+        "title": {
+          "en": "Tools & Capabilities",
+          "zh": "工具与能力"
+        }
+      },
+      "session": {
+        "title": {
+          "en": "Sessions & Messages",
+          "zh": "会话与消息"
+        }
+      }
+    },
+    "labels": {
+      "npm": {
+        "title": {
+          "en": "npm package",
+          "zh": "npm 包"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-argueme",
+      "title": {
+        "en": "dsh-argueme · Round Self-Review",
+        "zh": "dsh-argueme · 每轮自审"
+      },
+      "description": {
+        "en": "After each completed user round, automatically asks the assistant a first-principles critique follow-up (default 「第一性原理复核」), so it reviews its own previous answer. Ships a Plugins-page config card (toggle + editable prompt). Loop-safe by construction.",
+        "zh": "每轮用户对话正常结束后，自动以用户角色再发一次「第一性原理复核」追问，让助手复核自己上一轮回答。附带 Plugins 页配置卡片（开关 + 可编辑追问内容），结构上防死循环。"
+      },
+      "icon": "../icon.svg",
+      "author": "luckychen2018",
+      "homepage": "https://github.com/luckychen2018/dsh-argueme#readme",
+      "repository": {
+        "url": "https://github.com/luckychen2018/dsh-argueme"
+      },
+      "metadata": {
+        "category": "session",
+        "labels": [
+          "npm"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.2.3",
+          "publishTimestamp": 1792332000,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0-rc.2 <0.3.0"
+          }
+        }
+      ]
+    }
+  ]
+}

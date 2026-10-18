@@ -1,6 +1,6 @@
 {
   "name": "dsh-argueme",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "private": false,
   "description": "DSH plugin: after each completed user round, automatically asks the assistant a first-principles critique follow-up (「挑刺」) so it reviews its previous answer. Ships a Plugins-page config card (toggle + editable prompt).",
   "type": "module",
@@ -63,7 +63,8 @@
   },
   "homepage": "https://github.com/luckychen2018/dsh-argueme#readme",
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.0-rc.2 <0.3.0"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4"

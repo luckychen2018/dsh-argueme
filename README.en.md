@@ -75,6 +75,30 @@ Cost: each human round adds one full model call. Disable the row or set `enabled
 6) 最后一行输出：`结论：可接受`，或 `结论：需要修正：<最小必须修改项>`。若确认无问题，说明依据哪些证据判断它成立；不要为凑数编问题。
 ```
 
+## Publish & listing
+
+DSH ships **no central official plugin index**: a market is a user-added JSON index source
+(see the official guide: [Plugin market](https://deepseek-harness.github.io/deepseek-harness/guide/plugin-market)).
+"Getting into the official source" therefore means:
+
+1. **Publish the npm package** (the actual install source; most community indexes read npm):
+
+   ```bash
+   npm login --registry=https://registry.npmjs.org
+   npm publish --registry=https://registry.npmjs.org
+   ```
+
+   The local npm registry points at a mirror (`registry.npmmirror.com`) by default; pass the official
+   registry explicitly when publishing.
+2. **Request community catalog listing** (community-operated, not a DeepSeek review):
+   - `awesome-dsh-plugin/awesome-dsh-plugin`: open a PR following its `contributing.md` review criteria;
+     dshmarket points plugin submissions at this catalog.
+   - `EasonMWS/dsh-plugin-health`: auto-generated format-1 index from the npm ecosystem; inclusion is not
+     a security review.
+3. **Self-host an index (no approval)**: this repo ships `market/index.json` (format 1). Publish it with
+   GitHub Pages per [market/README.md](market/README.md), then add the URL in DSH under
+   **Plugins → Custom plugin markets → Discover → Add index source**.
+
 ## Development
 
 ```bash
