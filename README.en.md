@@ -85,6 +85,9 @@ Why it is inserted synchronously:
 - At most once per round; skipped when the goal is not `active`/`armed` (or its round budget is spent) or
   when other inbox input is pending; pending critique turns are retracted when the goal
   pauses/completes/blocks/clears, and on unload.
+- Known limitation: if the plugin is reinstalled/reloaded **mid-round**, the new instance has not
+  observed that round's goal-prompt claim, so it does not insert (one missed round by the
+  "never guess" rule); rounds fully observed after the reload behave normally.
 
 ## Built-in follow-up prompt (first principles)
 
