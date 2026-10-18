@@ -18,20 +18,28 @@
 
 ## Install
 
-### From the Web UI
+### A: DSH Desktop Plugins page (recommended)
 
-1. Open the sidebar **Plugins** page.
-2. Install this bundle from the GitHub URL (`https://github.com/luckychen2018/dsh-argueme`) or from a local checkout directory.
-3. Enable the `dsh-argueme` row. Refresh the page once so the client half (config card) is loaded.
+1. Clone this repository to any local directory.
+2. Run `pnpm install` in that directory (installs the host dependency `@deepseek-ai/schemastery`).
+3. Open the sidebar **Plugins** page and install this bundle **from the local directory**; or call
+   `plugin_manager install_bundle { target: "<absolute path>" }`.
+4. Enable the `dsh-argueme` row. Refresh the page once so the client half (config card) is loaded.
 
-### Local development
+> This package is not published to npm yet, so installing by package name is not supported.
+> Whether a GitHub URL is accepted by the install UI depends on the build; cloning first is the safe path.
+
+### B: With the `dsh` CLI
 
 ```bash
-pnpm install                # installs @deepseek-ai/schemastery (host Config schema dependency)
-pnpm dsh plugin --profile <profile> add /path/to/dsh-argueme
-# or via the agent tool:
-# plugin_manager install_bundle { target: "/path/to/dsh-argueme" }
+cd /path/to/dsh-argueme
+pnpm install
+dsh plugin --profile <profile> add <absolute path>
 ```
+
+> The `pnpm dsh ...` form only works inside a Harness source workspace (this repo has no `dsh` dependency).
+
+### Local development
 
 After editing `client.js`, reinstall the bundle (or restart the app) and refresh the Web page so the new client module is served.
 

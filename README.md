@@ -19,20 +19,28 @@ DSH（DeepSeek Harness）插件：每轮**由你发起**的对话正常结束后
 
 ## 安装
 
-### 从 Web UI 安装
+### 方式 A：DSH Desktop 插件页（推荐）
 
-1. 打开侧边栏 **Plugins** 页。
-2. 用 GitHub 地址（`https://github.com/luckychen2018/dsh-argueme`）或本地目录安装本 bundle。
-3. 启用 `dsh-argueme` 行；**刷新一次页面**，让 client 半边（配置卡片）加载。
+1. 先把仓库 clone 到本地任意目录。
+2. 在该目录执行 `pnpm install`（安装 Host 端依赖 `@deepseek-ai/schemastery`）。
+3. 打开侧边栏 **Plugins** 页，用**本地目录**安装本 bundle；或让 agent 调用
+   `plugin_manager install_bundle { target: "<本目录绝对路径>" }`。
+4. 启用 `dsh-argueme` 行；**刷新一次页面**，让 client 半边（配置卡片）加载。
 
-### 本地开发
+> 未经 npm 发布，所以暂不支持直接用包名安装；GitHub 地址的安装入口是否可用取决于具体构建，
+> 稳妥做法是先 clone 再按本地目录安装。
+
+### 方式 B：已安装 `dsh` CLI
 
 ```bash
-pnpm install                # 安装 @deepseek-ai/schemastery（Host 端 Config schema 依赖）
-pnpm dsh plugin --profile <profile> add /path/to/dsh-argueme
-# 或让 agent 调用：
-# plugin_manager install_bundle { target: "/path/to/dsh-argueme" }
+cd /path/to/dsh-argueme
+pnpm install
+dsh plugin --profile <profile> add <本目录绝对路径>
 ```
+
+> `pnpm dsh ...` 写法只在 Harness 源码工作区可用（本仓库不含 dsh 依赖）。
+
+### 本地开发
 
 修改 `client.js` 后需要重新安装 bundle（或重启 App），并刷新 Web 页面，新的 client 模块才会生效。
 
